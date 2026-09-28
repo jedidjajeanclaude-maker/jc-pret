@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JC PRET</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1a1d23;--mu:#6b7280;--ac:#2563eb;--ok:#16a34a;--no:#dc2626;--bd:#e5e7eb}
+@media (prefers-color-scheme:dark){:root{--bg:#111318;--card:#1b1f27;--tx:#eef0f4;--mu:#9aa3b2;--ac:#5b8def;--ok:#4ade80;--no:#f87171;--bd:#2b313c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--bd);z-index:5;padding-top:env(safe-area-inset-top,0)}
+.hd{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 2px}
+h1{font-size:1.15rem;margin:0}
+nav{display:flex;gap:4px;padding:4px 10px 8px;overflow-x:auto}
+nav button{flex:1;white-space:nowrap;border:0;background:transparent;color:var(--mu);padding:8px 10px;border-radius:10px;font-size:.9rem;font-weight:600;cursor:pointer}
+nav button.on{background:var(--ac);color:#fff}
+main{max-width:640px;margin:0 auto;padding:16px 16px 40px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+h2{font-size:1.05rem;margin:0 0 10px}
+label{display:block;font-size:.85rem;color:var(--mu);margin:12px 0 4px}
+input,select{width:100%;padding:10px 12px;font-size:1rem;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;background:var(--ac);color:#fff;padding:11px 14px;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;margin-top:14px}
+.btn.s{width:auto;margin:0;padding:8px 12px;font-size:.85rem}
+.btn.g{background:var(--bd);color:var(--tx)}
+.k{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.k div{background:var(--bg);border-radius:10px;padding:10px;text-align:center}
+.k b{display:block;font-size:1.05rem}.k span{font-size:.78rem;color:var(--mu)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tag{font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--bd)}
+.tag.ok{color:var(--ok)}.tag.no{color:var(--no)}
+.pb{height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin:10px 0}.pb i{display:block;height:100%;background:var(--ok)}
+.mu{color:var(--mu);font-size:.85rem}
+.pay{display:flex;gap:8px;margin-top:8px}.pay input{flex:1}
+.hi{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)}
+.em{text-align:center;color:var(--mu);padding:30px 0}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:20}.ov img{max-width:95%;max-height:95%}
+.auth{max-width:380px;margin:0 auto;padding:40px 16px}
+.err{color:var(--no);font-size:.9rem;margin-top:10px}
+#msgs{display:flex;flex-direction:column;margin-bottom:8px}
+.bub{padding:10px 12px;border-radius:12px;margin-bottom:8px;white-space:pre-wrap;max-width:92%}.bub.user{background:var(--ac);color:#fff;align-self:flex-end}.bub.assistant{background:var(--card);border:1px solid var(--bd)}
+a.l{color:var(--ac);cursor:pointer;font-size:.9rem}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,sendEmailVerification,sendPasswordResetEmail,signOut,reload} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,doc,setDoc,collection,addDoc,updateDoc,deleteDoc,onSnapshot,query,where,arrayUnion,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import {getFunctions,httpsCallable} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+
+/* ====== À MODIFIER ====== */
+const CFG={apiKey:"AIzaSyD6-UuqpAVbO7Sn-3AOd2gQkTXr8bNEc_g",authDomain:"jc-pret.firebaseapp.com",projectId:"jc-pret",appId:"1:154130506119:web:b86b2c636cbf2a7eea3322"};
+const ADMIN_EMAIL="jedidjajeanclaude@gmail.com";
+/* ======================== */
+
+const app=initializeApp(CFG),auth=getAuth(app),db=getFirestore(app),ask=httpsCallable(getFunctions(app,'us-central1'),'assistant');
+const $=s=>document.querySelector(s),RATE=.2;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f=(v,c)=>(Math.round(v*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:c==='CDF'?0:2,maximumFractionDigits:c==='CDF'?0:2})+' '+c;
+const lo=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10),today=()=>lo(new Date());
+const p30=()=>{const d=new Date();d.setDate(d.getDate()+30);return lo(d)};
+const fd=d=>new Date(d).toLocaleDateString('fr-FR');
+const due=l=>l.amt*(1+RATE),paid=l=>(l.pays||[]).reduce((a,p)=>a+p.amt,0);
+const rem=l=>{const r=due(l)-paid(l);return r<.005?0:r};
+const dl=l=>l.end?Math.round((new Date(l.end+'T00:00:00')-new Date(today()+'T00:00:00'))/864e5):null;
+const ERR={'auth/invalid-credential':'E-mail ou mot de passe incorrect.','auth/email-already-in-use':'Cet e-mail a déjà un compte.','auth/weak-password':'Mot de passe trop court (6 caractères minimum).','auth/invalid-email':'Adresse e-mail invalide.','auth/too-many-requests':'Trop d\'essais. Réessaie plus tard.'};
+const err=e=>ERR[e.code]||'Erreur : '+(e.code||e.message);
+const shrink=fl=>new Promise(r=>{const x=new FileReader();x.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,700/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.6))};i.onerror=()=>r('');i.src=x.result};x.onerror=()=>r('');x.readAsDataURL(fl)});
+let chat=[],busy=false,draft='';
+let me=null,isA=false,view='',loans=[],users=[],prof=null,unsubs=[],mode='in',msg='';
+let rates={USD:2250,EUR:2600,CDF:1};try{Object.assign(rates,JSON.parse(localStorage.getItem('rates')||'{}'))}catch(e){}
+
+/* ---------- Authentification ---------- */
+onAuthStateChanged(auth,u=>{
+  unsubs.forEach(x=>x());unsubs=[];me=u;loans=[];users=[];prof=null;chat=[];
+  if(!u)return authV();
+  if(!u.emailVerified)return verifyV();
+  isA=u.email.toLowerCase()===ADMIN_EMAIL.toLowerCase();view=isA?'home':'loan';
+  const L=collection(db,'loans');
+  if(isA){
+    unsubs.push(onSnapshot(L,s=>{loans=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,'users'),s=>{users=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+  }else{
+    unsubs.push(onSnapshot(query(L,where('uid','==',u.uid)),s=>{loans=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{prof=s.exists()?s.data():null;render()}));
+  }
+  render();
+});
+function authV(){
+  const reg=mode==='up';
+  $('#root').innerHTML=`<div class="auth"><h1 style="font-size:1.6rem">💰 JC PRET</h1><p class="mu">${reg?'Crée ton compte avec ton adresse Gmail.':'Connecte-toi pour accéder à l\'application.'}</p>
+<div class="card"><label>Adresse Gmail</label><input id="em" type="email" autocomplete="email" placeholder="nom@gmail.com">
+<label>Mot de passe</label><input id="pw" type="password" autocomplete="${reg?'new-password':'current-password'}">
+${reg?'<label>Confirmer le mot de passe</label><input id="pw2" type="password" autocomplete="new-password">':''}
+<button class="btn" id="go">${reg?'Créer mon compte':'Se connecter'}</button><div class="err" id="er">${esc(msg)}</div>
+<p style="margin:14px 0 0"><a class="l" id="sw">${reg?'J\'ai déjà un compte':'Créer un compte'}</a>${reg?'':' · <a class="l" id="fg">Mot de passe oublié</a>'}</p></div></div>`;
+  $('#sw').onclick=()=>{mode=reg?'in':'up';msg='';authV()};
+  if(!reg)$('#fg').onclick=async()=>{const e=$('#em').value.trim();if(!e){$('#er').textContent='Écris ton e-mail d\'abord.';return}try{await sendPasswordResetEmail(auth,e);$('#er').style.color='var(--ok)';$('#er').textContent='E-mail de réinitialisation envoyé.'}catch(x){$('#er').textContent=err(x)}};
+  $('#go').onclick=async()=>{
+    const e=$('#em').value.trim().toLowerCase(),p=$('#pw').value,er=$('#er');er.style.color='';
+    try{
+      if(reg){
+        if(!/^[^@\s]+@gmail\.com$/.test(e)){er.textContent='Utilise une adresse Gmail (…@gmail.com).';return}
+        if(p!==$('#pw2').value){er.textContent='Les mots de passe ne sont pas identiques.';return}
+        const c=await createUserWithEmailAndPassword(auth,e,p);await sendEmailVerification(c.user);
+      }else await signInWithEmailAndPassword(auth,e,p);
+    }catch(x){er.textContent=err(x)}
+  };
+}
+function verifyV(){
+  $('#root').innerHTML=`<div class="auth"><h1>📧 Vérifie ton e-mail</h1><div class="card"><p>Un e-mail de confirmation a été envoyé à <b>${esc(me.email)}</b>. Clique sur le lien, puis reviens ici.</p>
+<button class="btn" id="ok">J'ai confirmé mon e-mail</button><button class="btn g" id="re">Renvoyer l'e-mail</button><button class="btn g" id="lo">Se déconnecter</button><div class="err" id="er"></div></div></div>`;
+  $('#ok').onclick=async()=>{await reload(me);if(me.emailVerified)location.reload();else $('#er').textContent='Pas encore confirmé.'};
+  $('#re').onclick=async()=>{try{await sendEmailVerification(me);$('#er').style.color='var(--ok)';$('#er').textContent='E-mail renvoyé.'}catch(x){$('#er').textContent=err(x)}};
+  $('#lo').onclick=()=>signOut(auth);
+}
+
+/* ---------- Application ---------- */
+const alerts=()=>loans.filter(l=>rem(l)>0&&l.end&&dl(l)<=3).sort((a,b)=>dl(a)-dl(b));
+const alertTxt=l=>{const d=dl(l);return`${isA?esc(l.name)+' : ':''}${d<0?'en retard de '+(-d)+' jour(s)':d===0?'échéance AUJOURD\'HUI':'échéance dans '+d+' jour(s)'} — reste ${f(rem(l),l.cur)}`};
+const banner=()=>alerts().length?`<div class="card" style="border-color:var(--no)"><h2>🔔 Alarmes</h2>${alerts().map(l=>`<div class="hi"><span>${alertTxt(l)}</span></div>`).join('')}</div>`:'';
+function render(){
+  if(!me||!me.emailVerified)return;
+  const tabs=isA?[['home','Accueil'],['new','Nouveau prêt'],['loans','Prêts'],['users','Emprunteurs'],['chat','🤖 Assistant']]:[['loan','Mon prêt'],['id','Mon identité'],['chat','🤖 Assistant']];
+  $('#root').innerHTML=`<header><div class="hd"><h1>💰 JC PRET${isA?' · Admin':''}</h1><button class="btn s g" id="out">Déconnexion</button></div><nav>${tabs.map(t=>`<button data-v="${t[0]}" class="${view===t[0]?'on':''}">${t[1]}</button>`).join('')}</nav></header><main>${({home:homeV,new:newV,loans:loansV,users:usersV,loan:myLoanV,id:idV,chat:chatV})[view]()}</main>`;
+  if(view==='chat'&&$('#q')){$('#q').focus();window.scrollTo(0,document.body.scrollHeight)}
+}
+function loanCard(l){const r=rem(l),p=Math.min(100,paid(l)/due(l)*100),d=dl(l);
+  return`<div class="card"><div class="top"><b>${esc(l.name)}</b><span class="tag ${r?'no':'ok'}">${r?(d!==null&&d<0?'En retard':'En cours'):'Soldé'}</span></div>
+<div class="mu">Prêté ${f(l.amt,l.cur)} le ${fd(l.date)} · à rendre ${f(due(l),l.cur)} (+20 %)</div>
+<div class="mu">Échéance : ${l.end?fd(l.end):'—'}${r&&d!==null?` · <b>${d<0?'retard de '+(-d):d} jour(s)${d<0?'':' restant(s)'}</b>`:''}</div>
+<div class="pb"><i style="width:${p}%"></i></div>
+<div class="top"><span class="mu">Remboursé : ${f(paid(l),l.cur)}</span><b style="color:${r?'var(--no)':'var(--ok)'}">Reste : ${r?f(r,l.cur):'00'}</b></div>
+${(l.pays||[]).length?`<div class="mu" style="margin-top:8px">Paiements : ${l.pays.map(p=>`${fd(p.d)} (${f(p.amt,l.cur)})`).join(' · ')}</div>`:''}
+${isA?`${r?`<div class="pay"><input type="number" inputmode="decimal" min="0" placeholder="Montant reçu" id="p${l.id}"><button class="btn s" data-pay="${l.id}">Ajouter</button></div>`:''}<div class="pay" style="align-items:center"><span class="mu">Échéance</span><input type="date" data-end="${l.id}" value="${l.end||''}"><button class="btn s g" data-del="${l.id}">Supprimer</button></div>`:''}</div>`}
+function myLoanV(){
+  return banner()+(!prof?.inn?`<div class="card" style="border-color:var(--no)"><b>⚠ Complète ton identité</b><div class="mu">Va dans l'onglet « Mon identité » pour la remplir.</div></div>`:'')+(loans.length?loans.map(loanCard).join(''):'<div class="em">Aucun prêt pour le moment.</div>');
+}
+function idV(){const p=prof||{};
+  return`<div class="card"><h2>🪪 Mon identité</h2><label>Nom complet</label><input id="nm" value="${esc(p.name)}">
+<label>Téléphone</label><input id="ph" type="tel" value="${esc(p.ph)}" placeholder="+243 …"><label>Adresse</label><input id="ad" value="${esc(p.ad)}">
+<div class="row"><div><label>Type de pièce</label><select id="it">${['Carte d\'électeur','Passeport','Permis de conduire','Autre'].map(o=>`<option${p.it===o?' selected':''}>${o}</option>`).join('')}</select></div><div><label>N° de la pièce</label><input id="in" value="${esc(p.inn)}"></div></div>
+<label>Photo de la pièce</label><input id="im" type="file" accept="image/*">${p.img?`<img src="${p.img}" data-img style="height:70px;border-radius:8px;margin-top:8px;cursor:pointer" alt="">`:''}
+<button class="btn" id="saveid">Enregistrer</button><div class="mu" id="sv" style="margin-top:8px"></div></div>`}
+function homeV(){
+  const T={};loans.forEach(l=>{const t=T[l.cur]=T[l.cur]||{lent:0,due:0,paid:0,rem:0};t.lent+=l.amt;t.due+=due(l);t.paid+=paid(l);t.rem+=rem(l)});
+  let lent=0,exp=0,got=0,h=banner();
+  for(const c in T){const t=T[c],k=rates[c]||1,e=t.lent*RATE;lent+=t.lent*k;exp+=e*k;got+=Math.min(e,t.paid*RATE/(1+RATE))*k;
+    h+=`<div class="card"><h2>${c}</h2><div class="k"><div><b>${f(t.lent,c)}</b><span>Prêté</span></div><div><b>${f(t.due,c)}</b><span>À récupérer (+20 %)</span></div><div><b>${f(t.paid,c)}</b><span>Remboursé</span></div><div><b style="color:${t.rem?'var(--no)':'var(--ok)'}">${t.rem?f(t.rem,c):'00'}</b><span>Reste dû</span></div></div></div>`}
+  return h+(loans.length?`<div class="card"><h2>📈 Mes intérêts</h2><div class="k"><div><b>${f(exp,'CDF')}</b><span>Total des intérêts</span></div><div><b>${lent?Math.round(exp/lent*1000)/10:0} %</b><span>du capital prêté</span></div><div><b style="color:var(--ok)">${f(got,'CDF')}</b><span>Déjà encaissés</span></div><div><b>${f(exp-got,'CDF')}</b><span>Encore à encaisser</span></div></div>
+<div class="row"><div><label>1 USD = … CDF</label><input id="rU" type="number" value="${rates.USD}"></div><div><label>1 EUR = … CDF</label><input id="rE" type="number" value="${rates.EUR}"></div></div></div>`:'<div class="em">Aucun prêt enregistré.</div>');
+}
+function newV(){
+  const ok=users.filter(u=>u.inn);
+  if(!ok.length)return'<div class="em">Aucun emprunteur n\'a encore rempli son identité.<br>Il doit créer un compte et compléter « Mon identité ».</div>';
+  return`<div class="card"><h2>Nouveau prêt</h2><label>Emprunteur</label><select id="bu">${ok.map(u=>`<option value="${u.id}">${esc(u.name)} · ${esc(u.ph)}</option>`).join('')}</select>
+<div class="row"><div><label>Montant</label><input id="a" type="number" inputmode="decimal" min="0"></div><div><label>Devise</label><select id="c"><option>USD</option><option>CDF</option><option>EUR</option></select></div></div>
+<div class="row"><div><label>Date du prêt</label><input id="d" type="date" value="${today()}"></div><div><label>Échéance</label><input id="e" type="date" value="${p30()}"></div></div>
+<div class="card" style="margin:14px 0 0"><div class="mu">Total à rembourser (+20 %)</div><b id="t" style="font-size:1.3rem">–</b></div><button class="btn" id="add">Enregistrer le prêt</button></div>`}
+const loansV=()=>loans.length?[...loans].sort((a,b)=>b.date.localeCompare(a.date)).map(loanCard).join(''):'<div class="em">Aucun prêt.</div>';
+const usersV=()=>users.length?users.map(u=>`<div class="card"><b>${esc(u.name||'(sans nom)')}</b><div class="mu">${esc(u.email)}</div><div class="mu">${u.inn?`🪪 ${esc(u.it)} n° ${esc(u.inn)} · 📞 ${esc(u.ph)}${u.ad?' · 📍 '+esc(u.ad):''}`:'<span class="tag no">⚠ Identité non remplie</span>'}</div>${u.img?`<img src="${u.img}" data-img style="height:60px;border-radius:8px;margin-top:8px;cursor:pointer" alt="">`:''}</div>`).join(''):'<div class="em">Aucun emprunteur inscrit.</div>';
+
+const chatV=()=>`<div class="card"><h2>🤖 Assistant IA</h2><div class="mu">${isA?'Pose une question sur tes prêts : retards, intérêts, qui relancer, message de rappel…':'Pose une question sur ton prêt : ce qu\'il reste à payer, l\'échéance…'}</div></div><div id="msgs">${chat.map(m=>`<div class="bub ${m.role}">${esc(m.content)}</div>`).join('')}${busy?'<div class="bub assistant">…</div>':''}</div><div class="pay"><input id="q" placeholder="Écris ton message…" value="${esc(draft)}"><button class="btn s" id="send"${busy?' disabled':''}>Envoyer</button></div>`;
+async function send(){
+  const q=draft.trim();if(!q||busy)return;
+  chat.push({role:'user',content:q});draft='';busy=true;render();
+  try{const r=await ask({messages:chat.slice(-10),rates});chat.push({role:'assistant',content:r.data.text||'…'})}
+  catch(x){chat.push({role:'assistant',content:"Désolé, l'assistant est indisponible pour le moment."})}
+  busy=false;render();
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='q')send()});
+document.addEventListener('click',async e=>{
+  const t=e.target;if(!me||!me.emailVerified)return;
+  if(t.id==='out')signOut(auth);
+  if(t.id==='send')send();
+  if(t.dataset.v){view=t.dataset.v;render()}
+  if(t.dataset.img!==undefined&&t.tagName==='IMG'){const o=document.createElement('div');o.className='ov';o.innerHTML=`<img src="${t.src}" alt="">`;o.onclick=()=>o.remove();document.body.appendChild(o)}
+  try{
+    if(t.id==='saveid'){const nm=$('#nm').value.trim(),ph=$('#ph').value.trim(),inn=$('#in').value.trim();
+      if(!nm||!ph||!inn){alert('Nom, téléphone et numéro de pièce sont obligatoires.');return}
+      t.disabled=true;const fl=$('#im').files[0],img=fl?await shrink(fl):(prof?.img||'');
+      await setDoc(doc(db,'users',me.uid),{email:me.email,name:nm,ph,ad:$('#ad').value.trim(),it:$('#it').value,inn,img});
+      view='loan';render()}
+    if(t.id==='add'){const a=parseFloat($('#a').value),u=users.find(x=>x.id===$('#bu').value);if(!(a>0)||!u){alert('Montant invalide.');return}
+      t.disabled=true;await addDoc(collection(db,'loans'),{uid:u.id,name:u.name,amt:a,cur:$('#c').value,date:$('#d').value||today(),end:$('#e').value||'',pays:[],created:serverTimestamp()});view='loans';render()}
+    if(t.dataset.pay){const l=loans.find(x=>x.id===t.dataset.pay),v=parseFloat($('#p'+l.id).value);if(!(v>0))return;await updateDoc(doc(db,'loans',l.id),{pays:arrayUnion({amt:Math.min(v,rem(l)),d:today()})})}
+    if(t.dataset.del&&confirm('Supprimer ce prêt ?'))await deleteDoc(doc(db,'loans',t.dataset.del));
+  }catch(x){alert('Erreur : '+(x.code||x.message));t.disabled=false}
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='q')draft=e.target.value;
+  if(e.target.id==='a'){const a=parseFloat(e.target.value)||0;$('#t').textContent=a?f(a*(1+RATE),$('#c').value):'–'}
+});
+document.addEventListener('change',async e=>{
+  const t=e.target;if(!me)return;
+  if(t.id==='c'){const a=parseFloat($('#a').value)||0;$('#t').textContent=a?f(a*(1+RATE),t.value):'–'}
+  if(t.dataset.end&&isA)try{await updateDoc(doc(db,'loans',t.dataset.end),{end:t.value})}catch(x){alert('Erreur : '+x.code)}
+  if(t.id==='rU'||t.id==='rE'){const v=parseFloat(t.value);if(v>0){rates[t.id==='rU'?'USD':'EUR']=v;try{localStorage.setItem('rates',JSON.stringify(rates))}catch(x){}render()}}
+});
+</script>
+</body>
+</html>
